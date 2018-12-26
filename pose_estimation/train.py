@@ -28,8 +28,8 @@ from core.config import update_config
 from core.config import update_dir
 from core.config import get_model_name
 from core.loss import JointsMSELoss
-from core.function import train
-from core.function import validate
+from core.function import train,train_softargmax
+from core.function import validate,validate_softargmax
 from utils.utils import get_optimizer
 from utils.utils import save_checkpoint
 from utils.utils import create_logger
@@ -138,6 +138,7 @@ def main():
             normalize,
         ])
     )
+    '''
     valid_dataset = eval('dataset.'+config.DATASET.DATASET)(
         config,
         config.DATASET.ROOT,
@@ -148,7 +149,7 @@ def main():
             normalize,
         ])
     )
-
+    '''
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
         batch_size=config.TRAIN.BATCH_SIZE*len(gpus),
@@ -156,6 +157,7 @@ def main():
         num_workers=config.WORKERS,
         pin_memory=True
     )
+    '''
     valid_loader = torch.utils.data.DataLoader(
         valid_dataset,
         batch_size=config.TEST.BATCH_SIZE*len(gpus),
@@ -163,6 +165,7 @@ def main():
         num_workers=config.WORKERS,
         pin_memory=True
     )
+    '''
 
     best_perf = 0.0
     best_model = False
@@ -170,21 +173,23 @@ def main():
         lr_scheduler.step()
 
         # train for one epoch
-        train(config, train_loader, model, criterion, optimizer, epoch,
+        train_softargmax(config, train_loader, model, criterion, optimizer, epoch,
               final_output_dir, tb_log_dir, writer_dict)
 
-
+       
         # evaluate on validation set
-        perf_indicator = validate(config, valid_loader, valid_dataset, model,
+        '''
+        perf_indicator = validate_softargmax(config, valid_loader, valid_dataset, model,
                                   criterion, final_output_dir, tb_log_dir,
                                   writer_dict)
+        
 
         if perf_indicator > best_perf:
             best_perf = perf_indicator
             best_model = True
         else:
             best_model = False
-
+        
         logger.info('=> saving checkpoint to {}'.format(final_output_dir))
         save_checkpoint({
             'epoch': epoch + 1,
@@ -200,6 +205,7 @@ def main():
         final_model_state_file))
     torch.save(model.module.state_dict(), final_model_state_file)
     writer_dict['writer'].close()
+    '''
 
 
 if __name__ == '__main__':

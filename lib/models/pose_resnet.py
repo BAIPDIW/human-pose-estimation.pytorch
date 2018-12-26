@@ -13,7 +13,7 @@ import logging
 
 import torch
 import torch.nn as nn
-
+import dsntnn
 
 BN_MOMENTUM = 0.1
 logger = logging.getLogger(__name__)
@@ -115,7 +115,7 @@ class PoseResNet(nn.Module):
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
         self.layer3 = self._make_layer(block, 256, layers[2], stride=2)
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2)
-
+        self.bn2 = nn.BatchNorm2d(cfg.MODEL.NUM_JOINTS, momentum=BN_MOMENTUM)
         # used for deconv layers
         self.deconv_layers = self._make_deconv_layer(
             extra.NUM_DECONV_LAYERS,
@@ -202,7 +202,11 @@ class PoseResNet(nn.Module):
         x = self.deconv_layers(x)
         x = self.final_layer(x)
 
-        return x
+        x = dsntnn.flat_softmax(x)
+        x = self.bn2(x)
+        coords = dsntnn.dsnt(x)
+
+        return coords,x
 
     def init_weights(self, pretrained=''):
         if os.path.isfile(pretrained):

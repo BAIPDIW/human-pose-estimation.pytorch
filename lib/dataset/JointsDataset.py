@@ -82,8 +82,8 @@ class JointsDataset(Dataset):
         joints = db_rec['joints_3d']
         joints_vis = db_rec['joints_3d_vis']
 
-        c = db_rec['center']
-        s = db_rec['scale']
+        c = db_rec['center'] #[416.32 , 172.025]
+        s = db_rec['scale']  #[1.4049845, 1.8733125]
         score = db_rec['score'] if 'score' in db_rec else 1
         r = 0
 
@@ -113,11 +113,15 @@ class JointsDataset(Dataset):
         for i in range(self.num_joints):
             if joints_vis[i, 0] > 0.0:
                 joints[i, 0:2] = affine_transform(joints[i, 0:2], trans)
-
-        target, target_weight = self.generate_target(joints, joints_vis)
+        logger.info('joints = {}'.format(joints))
+        target, target_weight,coords,coords_vis= self.generate_target(joints, joints_vis)
 
         target = torch.from_numpy(target)
         target_weight = torch.from_numpy(target_weight)
+
+        coords = torch.from_numpy(coords)
+
+        coords_vis = torch.from_numpy(coords_vis)
 
         meta = {
             'image': image_file,
@@ -130,8 +134,8 @@ class JointsDataset(Dataset):
             'rotation': r,
             'score': score
         }
-
-        return input, target, target_weight, meta
+        
+        return input, target, target_weight, meta,coords,coords_vis
 
     def select_data(self, db):
         db_selected = []
@@ -172,6 +176,11 @@ class JointsDataset(Dataset):
         :param joints_vis: [num_joints, 3]
         :return: target, target_weight(1: visible, 0: invisible)
         '''
+        coords = np.ones((self.num_joints,2),dtype=np.float32)
+        coords[:,0:2] = joints[:,0:2]
+        coords_vis = np.ones((self.num_joints, 2), dtype=np.float32)
+        coords_vis = joints_vis[:, 0:2]
+
         target_weight = np.ones((self.num_joints, 1), dtype=np.float32)
         target_weight[:, 0] = joints_vis[:, 0]
 
@@ -218,5 +227,11 @@ class JointsDataset(Dataset):
                 if v > 0.5:
                     target[joint_id][img_y[0]:img_y[1], img_x[0]:img_x[1]] = \
                         g[g_y[0]:g_y[1], g_x[0]:g_x[1]]
-
-        return target, target_weight
+        
+        for joint_id in range(self.num_joints):
+            coords[joint_id][0] = (coords[joint_id][0] *2 + 1)/ self.image_size[0] -1
+            coords[joint_id][1] = (coords[joint_id][1] *2 + 1)/ self.image_size[1] -1
+        logger.info('coords = {}'.format(coords))
+        coords = coords.astype(np.float32)
+        coords_vis = coords_vis.astype(np.float32)
+        return target, target_weight,coords,coords_vis
