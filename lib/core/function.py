@@ -255,7 +255,7 @@ def euclidean_losses(actual, target,coords_vis):
 
     assert actual.size() == target.size(), 'input tensors must have the same size'
     # Calculate Euclidean distances between actual and target locations
-    
+    '''
     logger.info('-------------------------------------actual---------------------------------------------------')
     logger.info(actual[0])
     
@@ -276,10 +276,9 @@ def euclidean_losses(actual, target,coords_vis):
     logger.info(dist[0])
     '''
     diff = actual - target
-    diff = diff.mul(coords_vis)
     dist_sq = diff.pow(2).sum(-1, keepdim=False)
     dist = dist_sq.sqrt()
-    '''
+    
     return dist
 
 def train_softargmax(config, train_loader, model, criterion, optimizer, epoch,
@@ -342,7 +341,7 @@ def train_softargmax(config, train_loader, model, criterion, optimizer, epoch,
             pred = coords
             pred[:,:,0] = ((pred[:,:,0] + 1)*192 - 1)/2
             pred[:,:,1] = ((pred[:,:,1] + 1)*256 - 1)/2
-            logger.info(pred)
+            #logger.info(pred)
             prefix = '{}_{}'.format(os.path.join(output_dir, 'train'), i)
             save_debug_images(config, input, meta, target, pred, output,
                               prefix)

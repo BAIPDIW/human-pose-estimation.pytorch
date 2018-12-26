@@ -91,11 +91,13 @@ class COCODataset(JointsDataset):
 
         if is_train and cfg.DATASET.SELECT_DATA:
             self.db = self.select_data(self.db)
+        '''
         select = self.db[0]
         self.db = []
         self.db.append(select)
 
         logger.info(self.db)
+        '''
         logger.info('=> load {} samples'.format(len(self.db)))
 
     def _get_ann_file_keypoint(self):

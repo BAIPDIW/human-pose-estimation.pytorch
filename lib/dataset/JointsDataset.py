@@ -113,7 +113,7 @@ class JointsDataset(Dataset):
         for i in range(self.num_joints):
             if joints_vis[i, 0] > 0.0:
                 joints[i, 0:2] = affine_transform(joints[i, 0:2], trans)
-        logger.info('joints = {}'.format(joints))
+        #logger.info('joints = {}'.format(joints))
         target, target_weight,coords,coords_vis= self.generate_target(joints, joints_vis)
 
         target = torch.from_numpy(target)
@@ -231,7 +231,7 @@ class JointsDataset(Dataset):
         for joint_id in range(self.num_joints):
             coords[joint_id][0] = (coords[joint_id][0] *2 + 1)/ self.image_size[0] -1
             coords[joint_id][1] = (coords[joint_id][1] *2 + 1)/ self.image_size[1] -1
-        logger.info('coords = {}'.format(coords))
+        #logger.info('coords = {}'.format(coords))
         coords = coords.astype(np.float32)
         coords_vis = coords_vis.astype(np.float32)
         return target, target_weight,coords,coords_vis
