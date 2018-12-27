@@ -138,7 +138,7 @@ def main():
             normalize,
         ])
     )
-    '''
+    
     valid_dataset = eval('dataset.'+config.DATASET.DATASET)(
         config,
         config.DATASET.ROOT,
@@ -149,7 +149,7 @@ def main():
             normalize,
         ])
     )
-    '''
+    
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
         batch_size=config.TRAIN.BATCH_SIZE*len(gpus),
@@ -157,15 +157,15 @@ def main():
         num_workers=config.WORKERS,
         pin_memory=True
     )
-    '''
+    
     valid_loader = torch.utils.data.DataLoader(
-        valid_dataset,
+        train_dataset,
         batch_size=config.TEST.BATCH_SIZE*len(gpus),
         shuffle=False,
         num_workers=config.WORKERS,
         pin_memory=True
     )
-    '''
+    
 
     best_perf = 0.0
     best_model = False
@@ -178,12 +178,11 @@ def main():
 
        
         # evaluate on validation set
-        '''
-        perf_indicator = validate_softargmax(config, valid_loader, valid_dataset, model,
-                                  criterion, final_output_dir, tb_log_dir,
-                                  writer_dict)
         
-
+        validate_softargmax(config, valid_loader, valid_dataset, model,
+                                  criterion, final_output_dir, tb_log_dir,writer_dict)
+        
+        '''
         if perf_indicator > best_perf:
             best_perf = perf_indicator
             best_model = True
@@ -206,6 +205,7 @@ def main():
     torch.save(model.module.state_dict(), final_model_state_file)
     writer_dict['writer'].close()
     '''
+    
 
 
 if __name__ == '__main__':

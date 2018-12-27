@@ -368,11 +368,10 @@ def get_final_preds_softargmax(config, batch_heatmaps, center, scale,coords_pred
     '''
 
     preds = coords.copy()
-    preds = preds * np.array((heatmap_height,heatmap_width))
     # Transform back
     for i in range(coords.shape[0]):
         preds[i] = transform_preds(coords[i], center[i], scale[i],
-                                   [heatmap_width, heatmap_height])
+                                   config.MODEL.IMAGE_SIZE)
 
     return preds, maxvals
 def validate_softargmax(config, val_loader, val_dataset, model, criterion, output_dir,
@@ -397,27 +396,30 @@ def validate_softargmax(config, val_loader, val_dataset, model, criterion, outpu
         for i, (input, target, target_weight, meta,coords,coords_vis) in enumerate(val_loader):
             # compute output
             coords_pred,output = model(input)
+
+            coords_pred = coords_pred.cuda(non_blocking=True)
+            coords = coords.cuda(non_blocking=True)
+            coords_vis = coords_vis.cuda(non_blocking=True)
+            euc_losses = dsntnn.euclidean_losses(coords_pred,coords)
+            loss = dsntnn.average_loss(euc_losses)
+            logger.info('coords_pred before recovery = {}'.format(coords_pred))
+            coords_pred[:,:,0] = ((coords_pred[:,:,0] + 1)*192 - 1)/2
+            coords_pred[:,:,1] = ((coords_pred[:,:,1] + 1)*256 - 1)/2
             if config.TEST.FLIP_TEST:
                 # this part is ugly, because pytorch has not supported negative index
                 # input_flipped = model(input[:, :, :, ::-1])
                 input_flipped = np.flip(input.cpu().numpy(), 3).copy()
                 input_flipped = torch.from_numpy(input_flipped).cuda()
                 coords_pred_flipped,output_flipped = model(input_flipped)
+                coords_pred_flipped[:,:,0] = ((coords_pred_flipped[:,:,0] + 1)*192 - 1)/2
+                coords_pred_flipped[:,:,1] = ((coords_pred_flipped[:,:,1] + 1)*256 - 1)/2
                 coords_pred_flipped = fliplr_joints(coords_pred_flipped.cpu().numpy(),target.shape[3],
                                             coords_vis,val_dataset.flip_pairs)
 
                 # feature is not aligned, shift flipped heatmap for higher accuracy
-                if config.TEST.SHIFT_HEATMAP:
-                    coords_pred = (coords_pred + coords_pred_flipped)*0.5
-
-            coords_pred = coords_pred.cuda(non_blocking=True)
-            
-            coords = coords.cuda(non_blocking=True)
-            coords_vis = coords_vis.cuda(non_blocking=True)
-            
-            euc_losses = dsntnn.euclidean_losses(coords_pred,coords)
-
-            loss = dsntnn.average_loss(euc_losses)
+                #if config.TEST.SHIFT_HEATMAP:
+                    
+                coords_pred = (coords_pred + coords_pred_flipped)*0.5
 
             num_images = input.size(0)
             # measure accuracy and record loss
@@ -435,10 +437,10 @@ def validate_softargmax(config, val_loader, val_dataset, model, criterion, outpu
             c = meta['center'].numpy()
             s = meta['scale'].numpy()
             score = meta['score'].numpy()
-
+            #logger.info('coords_pred = {}'.format(coords_pred))
             preds, maxvals = get_final_preds_softargmax(
                 config, output.clone().cpu().numpy(), c, s,coords_pred)
-
+            logger.info('preds ={}'.format(preds))
             all_preds[idx:idx + num_images, :, 0:2] = preds[:, :, 0:2]
             all_preds[idx:idx + num_images, :, 2:3] = maxvals
             # double check this all_boxes parts
@@ -464,7 +466,7 @@ def validate_softargmax(config, val_loader, val_dataset, model, criterion, outpu
                 prefix = '{}_{}'.format(os.path.join(output_dir, 'val'), i)
                 #save_debug_images(config, input, meta, target, pred*4, output,
                 #                  prefix)
-
+        
         name_values, perf_indicator = val_dataset.evaluate(
             config, all_preds, output_dir, all_boxes, image_path,
             filenames, imgnums)
@@ -489,3 +491,4 @@ def validate_softargmax(config, val_loader, val_dataset, model, criterion, outpu
             writer_dict['valid_global_steps'] = global_steps + 1
 
     return perf_indicator
+    
