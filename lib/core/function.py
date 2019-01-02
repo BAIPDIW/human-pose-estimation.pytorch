@@ -402,7 +402,7 @@ def validate_softargmax(config, val_loader, val_dataset, model, criterion, outpu
             coords_vis = coords_vis.cuda(non_blocking=True)
             euc_losses = dsntnn.euclidean_losses(coords_pred,coords)
             loss = dsntnn.average_loss(euc_losses)
-            logger.info('coords_pred before recovery = {}'.format(coords_pred))
+            #logger.info('coords_pred before recovery = {}'.format(coords_pred))
             coords_pred[:,:,0] = ((coords_pred[:,:,0] + 1)*192 - 1)/2
             coords_pred[:,:,1] = ((coords_pred[:,:,1] + 1)*256 - 1)/2
             if config.TEST.FLIP_TEST:
@@ -440,7 +440,7 @@ def validate_softargmax(config, val_loader, val_dataset, model, criterion, outpu
             #logger.info('coords_pred = {}'.format(coords_pred))
             preds, maxvals = get_final_preds_softargmax(
                 config, output.clone().cpu().numpy(), c, s,coords_pred)
-            logger.info('preds ={}'.format(preds))
+            #logger.info('preds ={}'.format(preds))
             all_preds[idx:idx + num_images, :, 0:2] = preds[:, :, 0:2]
             all_preds[idx:idx + num_images, :, 2:3] = maxvals
             # double check this all_boxes parts
