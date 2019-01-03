@@ -178,7 +178,7 @@ def main():
 
        
         # evaluate on validation set
-        
+        '''
         perf_indicator=validate_softargmax(config, valid_loader, valid_dataset, model,
                                   criterion, final_output_dir, tb_log_dir,writer_dict)
         
@@ -204,6 +204,7 @@ def main():
         final_model_state_file))
     torch.save(model.module.state_dict(), final_model_state_file)
     writer_dict['writer'].close()
+    '''
     
     
 

@@ -10,9 +10,9 @@ DATASET:
   ROOT: 'data/coco/'
   TEST_SET: 'val2017'
   TRAIN_SET: 'train2017'
-  FLIP: true
-  ROT_FACTOR: 40
-  SCALE_FACTOR: 0.3
+  FLIP: false
+  ROT_FACTOR: 0
+  SCALE_FACTOR: 0
 MODEL:
   NAME: 'pose_resnet'
   PRETRAINED: 'models/pytorch/imagenet/resnet50-19c8e357.pth'
@@ -41,26 +41,24 @@ MODEL:
 LOSS:
   USE_TARGET_WEIGHT: true
 TRAIN:
-  BATCH_SIZE: 64
-  SHUFFLE: true
+  BATCH_SIZE: 32
+  SHUFFLE: false
   BEGIN_EPOCH: 0
-  END_EPOCH: 300
+  END_EPOCH: 140
   RESUME: false
-  OPTIMIZER: 'adam'
-  LR: 0.01
+  OPTIMIZER: 'sgd'
+  LR: 0.001
   LR_FACTOR: 0.1
   LR_STEP:
-  - 60
+  - 90
   - 120
-  - 180
-  - 240 
   WD: 0.0001
   GAMMA1: 0.99
   GAMMA2: 0.0
   MOMENTUM: 0.9
   NESTEROV: false
 TEST:
-  BATCH_SIZE: 64
+  BATCH_SIZE: 32
   COCO_BBOX_FILE: 'data/coco/person_detection_results/COCO_val2017_detections_AP_H_56_person.json'
   BBOX_THRE: 1.0
   FLIP_TEST: false

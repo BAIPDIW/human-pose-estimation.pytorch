@@ -91,10 +91,10 @@ class COCODataset(JointsDataset):
 
         if is_train and cfg.DATASET.SELECT_DATA:
             self.db = self.select_data(self.db)
-        '''
-        select = self.db[0]
+        select = self.db[0:6400]
         self.db = []
-        self.db.append(select)
+        self.db.extend(select)
+        '''
         logger.info(self.db)
         '''
         

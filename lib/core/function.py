@@ -338,7 +338,7 @@ def train_softargmax(config, train_loader, model, criterion, optimizer, epoch,
             writer.add_scalar('train_loss', losses.val, global_steps)
             #writer.add_scalar('train_acc', acc.val, global_steps)
             writer_dict['train_global_steps'] = global_steps + 1
-            pred = coords
+            pred = coords_pred
             pred[:,:,0] = ((pred[:,:,0] + 1)*192 - 1)/2
             pred[:,:,1] = ((pred[:,:,1] + 1)*256 - 1)/2
             #logger.info(pred)
