@@ -13,7 +13,7 @@ import logging
 
 import torch
 import torch.nn as nn
-
+from models.non_local_concatenation import NONLocalBlock2D
 
 BN_MOMENTUM = 0.1
 logger = logging.getLogger(__name__)
@@ -113,8 +113,11 @@ class PoseResNet(nn.Module):
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
         self.layer1 = self._make_layer(block, 64, layers[0])
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
+        self.NONLocalBlock2D2 = NONLocalBlock2D(in_channels=512)
         self.layer3 = self._make_layer(block, 256, layers[2], stride=2)
+        self.NONLocalBlock2D3 = NONLocalBlock2D(in_channels=1024)
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2)
+        self.NONLocalBlock2D4 = NONLocalBlock2D(in_channels=2048)
 
         # used for deconv layers
         self.deconv_layers = self._make_deconv_layer(
