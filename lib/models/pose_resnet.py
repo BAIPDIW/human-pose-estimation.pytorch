@@ -199,8 +199,11 @@ class PoseResNet(nn.Module):
 
         x = self.layer1(x)
         x = self.layer2(x)
+        x = self.NONLocalBlock2D2(x)
         x = self.layer3(x)
+        x = self.NONLocalBlock2D3(x)
         x = self.layer4(x)
+        x = self.NONLocalBlock2D4(x)
 
         x = self.deconv_layers(x)
         x = self.final_layer(x)
