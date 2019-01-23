@@ -62,9 +62,9 @@ def parse_args():
     parser.add_argument('--use-detect-bbox',
                         help='use detect bbox',
                         action='store_true')
-    parser.add_argument('--flip-test',
+    parser.add_argument('--not_flip_test',
                         help='use flip test',
-                        action='store_true')
+                        action='store_false')
     parser.add_argument('--post-process',
                         help='use post process',
                         action='store_true')
@@ -87,8 +87,8 @@ def reset_config(config, args):
         config.WORKERS = args.workers
     if args.use_detect_bbox:
         config.TEST.USE_GT_BBOX = not args.use_detect_bbox
-    if args.flip_test:
-        config.TEST.FLIP_TEST = args.flip_test
+    if not args.not_flip_test:
+        config.TEST.FLIP_TEST = args.not_flip_test
     if args.post_process:
         config.TEST.POST_PROCESS = args.post_process
     if args.shift_heatmap:
@@ -97,6 +97,8 @@ def reset_config(config, args):
         config.TEST.MODEL_FILE = args.model_file
     if args.coco_bbox_file:
         config.TEST.COCO_BBOX_FILE = args.coco_bbox_file
+    if args.frequent:
+        config.PRINT_FREQ  = args.frequent
 
 
 def main():
@@ -108,7 +110,6 @@ def main():
 
     logger.info(pprint.pformat(args))
     logger.info(pprint.pformat(config))
-
     # cudnn related setting
     cudnn.benchmark = config.CUDNN.BENCHMARK
     torch.backends.cudnn.deterministic = config.CUDNN.DETERMINISTIC
