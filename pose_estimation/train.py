@@ -182,6 +182,7 @@ def main():
         if perf_indicator > best_perf:
             best_perf = perf_indicator
             best_model = True
+            torch.save(model.module.state_dict(),os.path.join(final_output_dir, 'model_best.pth.tar'))
         else:
             best_model = False
 
@@ -192,7 +193,7 @@ def main():
             'state_dict': model.state_dict(),
             'perf': perf_indicator,
             'optimizer': optimizer.state_dict(),
-        }, best_model, final_output_dir)
+        }, final_output_dir)
 
     final_model_state_file = os.path.join(final_output_dir,
                                           'final_state.pth.tar')
