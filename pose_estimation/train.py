@@ -61,6 +61,9 @@ def parse_args():
     parser.add_argument('--workers',
                         help='num of dataloader workers',
                         type=int)
+    parser.add_argument('--resume',
+                        help='train from the specified checkpoint',
+                        type=str)
 
     args = parser.parse_args()
 
@@ -166,6 +169,13 @@ def main():
 
     best_perf = 0.0
     best_model = False
+    if args.resume:
+        logger.info('train from checkpoint: {}'.format(args.resume))
+        pretrain_state_dict = torch.load(args.resume)
+        config.TRAIN.BEGIN_EPOCH = pretrain_state_dict['epoch']
+        model.load_state_dict(pretrain_state_dict['state_dict'])
+        best_perf = pretrain_state_dict['perf']
+        optimizer.load_state_dict(pretrain_state_dict['optimizer'])
     for epoch in range(config.TRAIN.BEGIN_EPOCH, config.TRAIN.END_EPOCH):
         lr_scheduler.step()
 
