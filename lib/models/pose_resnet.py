@@ -18,22 +18,59 @@ BN_MOMENTUM = 0.1
 logger = logging.getLogger(__name__)
 
 class ChannelAttention(nn.Module):
-    def __init__(self, in_planes, ratio=16):
+    # def __init__(self, in_planes, ratio=16):
+    #     super(ChannelAttention, self).__init__()
+    #     self.avg_pool = nn.AdaptiveAvgPool2d(1)
+    #     self.max_pool = nn.AdaptiveMaxPool2d(1)
+
+    #     self.fc1   = nn.Conv2d(in_planes, in_planes // 16, 1, bias=False)
+    #     self.relu1 = nn.ReLU()
+    #     self.fc2   = nn.Conv2d(in_planes // 16, in_planes, 1, bias=False)
+
+    #     self.sigmoid = nn.Sigmoid()
+
+    # def forward(self, x):
+    #     avg_out = self.fc2(self.relu1(self.fc1(self.avg_pool(x))))
+    #     max_out = self.fc2(self.relu1(self.fc1(self.max_pool(x))))
+    #     out = avg_out + max_out
+    #     return self.sigmoid(out)
+    def __init__(self, in_planes):
         super(ChannelAttention, self).__init__()
-        self.avg_pool = nn.AdaptiveAvgPool2d(1)
-        self.max_pool = nn.AdaptiveMaxPool2d(1)
+        self.conv1 = nn.Conv2d(in_planes,128,kernel_size = 1,bias=False)
+        self.bn1 = nn.BatchNorm2d(128,momentum=BN_MOMENTUM)
+        self.relu1 = nn.ReLU(inplace=True)
 
-        self.fc1   = nn.Conv2d(in_planes, in_planes // 16, 1, bias=False)
-        self.relu1 = nn.ReLU()
-        self.fc2   = nn.Conv2d(in_planes // 16, in_planes, 1, bias=False)
+        self.conv_pool_bn = nn.BatchNorm2d(1,momentum=BN_MOMENTUM)
 
+        self.conv2 = nn.Conv2d(in_channels = 128,out_channels = 512,kernel_size = (1,128), groups=128,bias=False)
+        self.bn2 = nn.BatchNorm2d(512,momentum=BN_MOMENTUM)
+        self.LReLU = nn.LeakyReLU(negative_slope=0.1,inplace=True)
+
+        self.conv3 = nn.Conv2d(in_channels=512,out_channels=in_planes,kernel_size = 1,bias=False)
         self.sigmoid = nn.Sigmoid()
-
+    
     def forward(self, x):
-        avg_out = self.fc2(self.relu1(self.fc1(self.avg_pool(x))))
-        max_out = self.fc2(self.relu1(self.fc1(self.max_pool(x))))
-        out = avg_out + max_out
-        return self.sigmoid(out)
+        y = self.conv1(x)
+        y = self.bn1(y)
+        y = self.relu1(y)
+
+        batch_size,channel,h,w = y.size()
+        y = y.view(batch_size,channel,h*w)
+        y = y.bmm(y.transpose(1,2))
+        y = y.unsqueeze(1)
+        y = self.conv_pool_bn(y)
+
+
+        y = self.conv2(y.transpose(1,2))
+        y = self.bn2(y)
+        y = self.LReLU(y)
+
+        y = self.conv3(y)
+        y = self.sigmoid(y)
+
+        return y
+
+
 
 class SpatialAttention(nn.Module):
     def __init__(self, kernel_size=7):
