@@ -131,6 +131,18 @@ class PoseResNet(nn.Module):
             padding=1 if extra.FINAL_CONV_KERNEL == 3 else 0
         )
 
+        self.conv2 = nn.Conv2d(256,256,kernel_size=3,stride=1,padding=1,bias = False)
+        self.bn2 = nn.BatchNorm2d(256,momentum=BN_MOMENTUM)
+        self.reul2 = nn.ReLU(inplcae = True)
+
+        self.level2_layer = nn.conv2d(
+            in_channels = extra.NUM_DECONV_FILTERS[-1],
+            out_channels = 12,
+            kernel_size = extra.FINAL_CONV_KERNEL,
+            stride = 1,
+            padding = 1 if extra.FINAL_CONV_KERNEL == 3 else 0
+        )
+
     def _make_layer(self, block, planes, blocks, stride=1):
         downsample = None
         if stride != 1 or self.inplanes != planes * block.expansion:
@@ -200,9 +212,15 @@ class PoseResNet(nn.Module):
         x = self.layer4(x)
 
         x = self.deconv_layers(x)
+
+        x_level2 = self.conv2(x)
+        x_level2 = self.bn2(x_level2)
+        x_level2 = self.relu2(x_level2)
+        x_level2 = self.level2_layer(x)
+        
         x = self.final_layer(x)
 
-        return x
+        return x,x_level2
 
     def init_weights(self, pretrained=''):
         if os.path.isfile(pretrained):

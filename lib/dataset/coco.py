@@ -21,7 +21,7 @@ from pycocotools.cocoeval import COCOeval
 
 from dataset.JointsDataset import JointsDataset
 from nms.nms import oks_nms
-
+import math
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +64,8 @@ class COCODataset(JointsDataset):
         self.aspect_ratio = self.image_width * 1.0 / self.image_height
         self.pixel_std = 200
         self.coco = COCO(self._get_ann_file_keypoint())
-
+        self.skeleton = [[[16,14],[14,12],[15,13],[13,11],[10,8],[8,6],[9,7],[7,5],
+                            [3,2],[2,0],[4,1],[1,0]],[[0,1],[2,3],[4,5],[6,7],[8,9],[10,11]]]
         # deal with class names
         cats = [cat['name']
                 for cat in self.coco.loadCats(self.coco.getCatIds())]
@@ -407,3 +408,178 @@ class COCODataset(JointsDataset):
         logger.info('=> coco eval results saved to %s' % eval_file)
 
         return info_str
+    
+    
+    def generate_target(self, joints, joints_vis):
+        '''
+        :param joints:  [num_joints, 3]
+        :param joints_vis: [num_joints, 3]
+        :return: target, target_weight(1: visible, 0: invisible)
+        '''
+        targets = []
+        target_weights = []
+
+        target_weight = np.ones((self.num_joints, 1), dtype=np.float32)
+        target_weight[:, 0] = joints_vis[:, 0]
+
+        assert self.target_type == 'gaussian', \
+            'Only support gaussian map now!'
+
+        if self.target_type == 'gaussian':
+            target = np.zeros((self.num_joints,
+                               self.heatmap_size[1],
+                               self.heatmap_size[0]),
+                              dtype=np.float32)
+
+            tmp_size = self.sigma * 3
+
+            for joint_id in range(self.num_joints):
+                feat_stride = self.image_size / self.heatmap_size
+                mu_x = int(joints[joint_id][0] / feat_stride[0] + 0.5)
+                mu_y = int(joints[joint_id][1] / feat_stride[1] + 0.5)
+                # Check that any part of the gaussian is in-bounds
+                ul = [int(mu_x - tmp_size), int(mu_y - tmp_size)]
+                br = [int(mu_x + tmp_size + 1), int(mu_y + tmp_size + 1)]
+                if ul[0] >= self.heatmap_size[0] or ul[1] >= self.heatmap_size[1] \
+                        or br[0] < 0 or br[1] < 0:
+                    # If not, just return the image as is
+                    target_weight[joint_id] = 0
+                    continue
+
+                # # Generate gaussian
+                size = 2 * tmp_size + 1
+                x = np.arange(0, size, 1, np.float32)
+                y = x[:, np.newaxis]
+                x0 = y0 = size // 2
+                # The gaussian is not normalized, we want the center value to equal 1
+                g = np.exp(- ((x - x0) ** 2 + (y - y0) ** 2) / (2 * self.sigma ** 2))
+
+                # Usable gaussian range
+                g_x = max(0, -ul[0]), min(br[0], self.heatmap_size[0]) - ul[0]
+                g_y = max(0, -ul[1]), min(br[1], self.heatmap_size[1]) - ul[1]
+                # Image range
+                img_x = max(0, ul[0]), min(br[0], self.heatmap_size[0])
+                img_y = max(0, ul[1]), min(br[1], self.heatmap_size[1])
+
+                v = target_weight[joint_id]
+                if v > 0.5:
+                    target[joint_id][img_y[0]:img_y[1], img_x[0]:img_x[1]] = \
+                        g[g_y[0]:g_y[1], g_x[0]:g_x[1]]
+        targets.append(target)
+        target_weights.append(target_weight)
+
+        level2 = self.skeleton[0]
+
+        target_level2_weight = np.ones((len(level2), 1), dtype=np.float32)
+        target_level2 = np.zeros((len(level2),
+                                self.heatmap_size[1],
+                                self.heatmap_size[0]),
+                                dtype=np.float32)
+        
+        for i,skeleton in enumerate(level2):
+            idx1,idx2 = skeleton
+            if target[idx1] > 0.5 and target[idx2] > 0.5:
+                pt1 = joints[idx1]
+                pt2 = joints[idx2]
+                feat_stride = self.image_size / self.heatmap_size
+                tmp_size = self.sigma*3
+                
+                pt1_x = int(pt1[0] / feat_stride[0] + 0.5)
+                pt1_y = int(pt1[1] / feat_stride[1] + 0.5)
+                
+                pt2_x = int(pt2[0] / feat_stride[0] + 0.5)
+                pt2_y = int(pt2[1] / feat_stride[1] + 0.5)
+
+                ul1 = [int(pt1_x - tmp_size), int(pt1_y - tmp_size)]
+                br1 = [int(pt1_x + tmp_size + 1), int(pt1_y + tmp_size + 1)] 
+
+                ul2 = [int(pt2_x - tmp_size), int(pt2_y - tmp_size)]
+                br2 = [int(pt2_x + tmp_size + 1), int(pt2_y + tmp_size + 1)]
+
+                if ul1[0] >= self.heatmap_size[0] or ul1[1] >= self.heatmap_size[1] \
+                    or br1[0] < 0 or br1[1] < 0 or ul2[0] >= self.heatmap_size[0] or \
+                    ul2[1] >= self.heatmap_size[1] or br2[0] < 0 or br2[1] < 0 :
+                    # If not, just return the image as is
+                    target_level2_weight[i] = 0
+                    continue
+
+                pt1 = [pt1_x,pt1_y]
+                pt2 = [pt2_x,pt2_y]
+                target_level2[i] = self.drawLimbMap(target_level2[i],pt1,pt2,self.sigma)
+        targets.append(target_level2)
+        target_weights.append(target_level2_weight)
+        return targets, target_weights
+    
+    def drawGaussian(self,target_level2,pt1,sigma):
+        
+        ul = [int(pt1[0] - sigma *3), int(pt1[1] - sigma *3)]
+        br = [int(pt1[0] + sigma *3 + 1), int(pt1[1] + sigma *3 + 1)] 
+
+        size = 2 * sigma * 3 + 1
+        x = np.arange(0, size, 1, np.float32)
+        y = x[:, np.newaxis]
+        x0 = y0 = size // 2
+        # The gaussian is not normalized, we want the center value to equal 1
+        g = np.exp(- ((x - x0) ** 2 + (y - y0) ** 2) / (2 * self.sigma ** 2))
+
+        # Usable gaussian range
+        g_x = max(0, -ul[0]), min(br[0], self.heatmap_size[0]) - ul[0]
+        g_y = max(0, -ul[1]), min(br[1], self.heatmap_size[1]) - ul[1]
+        # Image range
+        img_x = max(0, ul[0]), min(br[0], self.heatmap_size[0])
+        img_y = max(0, ul[1]), min(br[1], self.heatmap_size[1])
+
+        target_level2[img_y[0]:img_y[1], img_x[0]:img_x[1]] = \
+                g[g_y[0]:g_y[1], g_x[0]:g_x[1]]        
+        return target_level2
+
+
+    def drawLimbMap(self,target_level2,pt1,pt2,sigma):
+        
+        def getSegmentPoints(x1,y1,x2,y2):
+            steep = abs(y2-y1) > abs(x2-x1)
+        
+            if steep:
+                x1,y1 = y1,x1
+                x2,y2 = y2,x2
+            
+            if x1 > x2:
+                x1,x2 = x2,x1
+                y1,y2 = y2,y1
+            
+            dx = x2-x1
+            dy = abs(y2 - y1)
+
+            error = dx/2.0
+
+            ystep = y1 < y2 and 1 or -1
+
+            y = math.floor(y1)
+            maxX = math.floor(x2)
+
+            x = x1
+            res = np.zeros((maxX-x1,2))
+
+            for i in range(res.size()[0]):
+                if steep:
+                    res[i][0] = y
+                    res[i][1] = x
+                else:
+                    res[i][0] = x
+                    res[i][1] = y
+                error = error - dy
+                if error < 0 :
+                    y = y + ystep
+                    error = error + dx
+                x = x + 1
+            return res
+
+
+        if pt1[0] == pt2[0] and pt1[1] == pt2[1]:
+            target_level2 = self.drawGaussian(target_level2,pt1,sigma)
+        
+        segment = getSegmentPoints(pt1[0],pt1[1],pt2[0],pt2[1])
+        for i in range(segment.shape[0]):
+            target_level2 = self.drawGaussian(target_level2,[segment[i][0],segment[1]],sigma)
+
+        return target_level2

@@ -36,18 +36,31 @@ def train(config, train_loader, model, criterion, optimizer, epoch,
     model.train()
 
     end = time.time()
-    for i, (input, target, target_weight, meta) in enumerate(train_loader):
+    for i, (input, targets, target_weights, meta) in enumerate(train_loader):
         # measure data loading time
         data_time.update(time.time() - end)
 
         # compute output
-        output = model(input)
+        output,output_level2 = model(input)
+        
+        target = targets[0]
+        target_weight = target_weights[0]
+        target_level2 = targets[1]
+        target_level2_weight = target_weights[1]
+        
         target = target.cuda(non_blocking=True)
         target_weight = target_weight.cuda(non_blocking=True)
+        
+        target_level2 = target.cuda(non_blocking=True)
+        target_level2_weight = target_weight.cuda(non_blocking=True)
+        
 
         loss = criterion(output, target, target_weight)
+        loss_level2 = criterion(output_level2,target_level2,target_level2_weight)
 
+        loss = loss + loss_level2
         # compute gradient and do update step
+        
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
@@ -105,9 +118,9 @@ def validate(config, val_loader, val_dataset, model, criterion, output_dir,
     idx = 0
     with torch.no_grad():
         end = time.time()
-        for i, (input, target, target_weight, meta) in enumerate(val_loader):
+        for i, (input, targets, target_weights, meta) in enumerate(val_loader):
             # compute output
-            output = model(input)
+            output,_ = model(input)
             if config.TEST.FLIP_TEST:
                 # this part is ugly, because pytorch has not supported negative index
                 # input_flipped = model(input[:, :, :, ::-1])
@@ -125,6 +138,9 @@ def validate(config, val_loader, val_dataset, model, criterion, output_dir,
                     # output_flipped[:, :, :, 0] = 0
 
                 output = (output + output_flipped) * 0.5
+            
+            target = targets[0]
+            target_weight = target_weights[0]
 
             target = target.cuda(non_blocking=True)
             target_weight = target_weight.cuda(non_blocking=True)
