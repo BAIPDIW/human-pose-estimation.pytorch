@@ -133,9 +133,9 @@ class PoseResNet(nn.Module):
 
         self.conv2 = nn.Conv2d(256,256,kernel_size=3,stride=1,padding=1,bias = False)
         self.bn2 = nn.BatchNorm2d(256,momentum=BN_MOMENTUM)
-        self.reul2 = nn.ReLU(inplcae = True)
+        self.relu2 = nn.ReLU(inplace = True)
 
-        self.level2_layer = nn.conv2d(
+        self.level2_layer = nn.Conv2d(
             in_channels = extra.NUM_DECONV_FILTERS[-1],
             out_channels = 12,
             kernel_size = extra.FINAL_CONV_KERNEL,

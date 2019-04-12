@@ -478,7 +478,7 @@ class COCODataset(JointsDataset):
         
         for i,skeleton in enumerate(level2):
             idx1,idx2 = skeleton
-            if target[idx1] > 0.5 and target[idx2] > 0.5:
+            if target_weight[idx1] > 0.5 and target_weight[idx2] > 0.5:
                 pt1 = joints[idx1]
                 pt2 = joints[idx2]
                 feat_stride = self.image_size / self.heatmap_size
@@ -528,9 +528,9 @@ class COCODataset(JointsDataset):
         # Image range
         img_x = max(0, ul[0]), min(br[0], self.heatmap_size[0])
         img_y = max(0, ul[1]), min(br[1], self.heatmap_size[1])
-
         target_level2[img_y[0]:img_y[1], img_x[0]:img_x[1]] = \
-                g[g_y[0]:g_y[1], g_x[0]:g_x[1]]        
+                g[g_y[0]:g_y[1], g_x[0]:g_x[1]]  
+     
         return target_level2
 
 
@@ -560,7 +560,7 @@ class COCODataset(JointsDataset):
             x = x1
             res = np.zeros((maxX-x1,2))
 
-            for i in range(res.size()[0]):
+            for i in range(res.shape[0]):
                 if steep:
                     res[i][0] = y
                     res[i][1] = x
@@ -580,6 +580,6 @@ class COCODataset(JointsDataset):
         
         segment = getSegmentPoints(pt1[0],pt1[1],pt2[0],pt2[1])
         for i in range(segment.shape[0]):
-            target_level2 = self.drawGaussian(target_level2,[segment[i][0],segment[1]],sigma)
+            target_level2 = self.drawGaussian(target_level2,[segment[i][0],segment[i][1]],sigma)
 
         return target_level2
