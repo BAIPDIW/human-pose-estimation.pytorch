@@ -116,8 +116,12 @@ class JointsDataset(Dataset):
 
         target, target_weight = self.generate_target(joints, joints_vis)
 
-        target = torch.from_numpy(target)
-        target_weight = torch.from_numpy(target_weight)
+        target[0] = torch.from_numpy(target[0])
+        target_weight[0] = torch.from_numpy(target_weight[0])
+        target[1] = torch.from_numpy(target[1])
+        target_weight[1] = torch.from_numpy(target_weight[1])
+        target[2] = torch.from_numpy(target[2])
+        target_weight[2] = torch.from_numpy(target_weight[2])
 
         meta = {
             'image': image_file,

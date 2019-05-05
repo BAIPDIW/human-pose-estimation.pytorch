@@ -41,24 +41,36 @@ def train(config, train_loader, model, criterion, optimizer, epoch,
         data_time.update(time.time() - end)
 
         # compute output
-        output,output_level2 = model(input)
+        output_level0, output_level1, output_level2, output_level3, output_level4 = model(input)
         
-        target = targets[0]
-        target_weight = target_weights[0]
-        target_level2 = targets[1]
-        target_level2_weight = target_weights[1]
         
-        target = target.cuda(non_blocking=True)
-        target_weight = target_weight.cuda(non_blocking=True)
+        target_level0 = targets[0]
+        target_level0_weight = target_weights[0]
+
+        target_level1 = targets[1]
+        target_level1_weight = target_weights[1]
+
+        target_level2 = targets[2]
+        target_level2_weight = target_weights[2]
         
-        target_level2 = target.cuda(non_blocking=True)
-        target_level2_weight = target_weight.cuda(non_blocking=True)
+        
+        target_level0 = target_level0.cuda(non_blocking=True)
+        target_level0_weight = target_level0_weight.cuda(non_blocking=True)
+        
+        target_level1 = target_level1.cuda(non_blocking=True)
+        target_level1_weight = target_level1_weight.cuda(non_blocking=True)
+
+        target_level2 = target_level2.cuda(non_blocking=True)
+        target_level2_weight = target_level2_weight.cuda(non_blocking=True)
         
 
-        loss = criterion(output, target, target_weight)
-        loss_level2 = criterion(output_level2,target_level2,target_level2_weight)
+        loss_level0 = criterion(output_level0, target_level0, target_level0_weight)
+        loss_level1 = criterion(output_level1, target_level1,target_level1_weight)
+        loss_level2 = criterion(output_level2, target_level2,target_level2_weight)
+        loss_level3 = criterion(output_level3, target_level1,target_level1_weight)
+        loss_level4 = criterion(output_level4, target_level0,target_level0_weight)
 
-        loss = loss + loss_level2
+        loss = loss_level0 + loss_level1 + loss_level2 +loss_level3 + loss_level4
         # compute gradient and do update step
         
         optimizer.zero_grad()
@@ -68,8 +80,8 @@ def train(config, train_loader, model, criterion, optimizer, epoch,
         # measure accuracy and record loss
         losses.update(loss.item(), input.size(0))
 
-        _, avg_acc, cnt, pred = accuracy(output.detach().cpu().numpy(),
-                                         target.detach().cpu().numpy())
+        _, avg_acc, cnt, pred = accuracy(output_level4.detach().cpu().numpy(),
+                                         target_level0.detach().cpu().numpy())
         acc.update(avg_acc, cnt)
 
         # measure elapsed time
@@ -95,7 +107,7 @@ def train(config, train_loader, model, criterion, optimizer, epoch,
             writer_dict['train_global_steps'] = global_steps + 1
 
             prefix = '{}_{}'.format(os.path.join(output_dir, 'train'), i)
-            save_debug_images(config, input, meta, target, pred*4, output,
+            save_debug_images(config, input, meta, target_level1, pred*4, output_level4,
                               prefix)
 
 
@@ -120,13 +132,13 @@ def validate(config, val_loader, val_dataset, model, criterion, output_dir,
         end = time.time()
         for i, (input, targets, target_weights, meta) in enumerate(val_loader):
             # compute output
-            output,_ = model(input)
+            _,_,_,_,output = model(input)
             if config.TEST.FLIP_TEST:
                 # this part is ugly, because pytorch has not supported negative index
                 # input_flipped = model(input[:, :, :, ::-1])
                 input_flipped = np.flip(input.cpu().numpy(), 3).copy()
                 input_flipped = torch.from_numpy(input_flipped).cuda()
-                output_flipped = model(input_flipped)
+                _,_,_,_,output_flipped = model(input_flipped)
                 output_flipped = flip_back(output_flipped.cpu().numpy(),
                                            val_dataset.flip_pairs)
                 output_flipped = torch.from_numpy(output_flipped.copy()).cuda()

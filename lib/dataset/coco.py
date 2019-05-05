@@ -469,16 +469,22 @@ class COCODataset(JointsDataset):
         target_weights.append(target_weight)
 
         level2 = self.skeleton[0]
+        level3 = self.skeleton[1]
 
         target_level2_weight = np.ones((len(level2), 1), dtype=np.float32)
+        target_level3_weight = np.ones((len(level3), 1), dtype=np.float32)
         target_level2 = np.zeros((len(level2),
+                                self.heatmap_size[1],
+                                self.heatmap_size[0]),
+                                dtype=np.float32)
+        target_level3 = np.zeros((len(level3),
                                 self.heatmap_size[1],
                                 self.heatmap_size[0]),
                                 dtype=np.float32)
         
         for i,skeleton in enumerate(level2):
             idx1,idx2 = skeleton
-            if target[idx1] > 0.5 and target[idx2] > 0.5:
+            if target_weight[idx1] > 0.5 and target_weight[idx2] > 0.5:
                 pt1 = joints[idx1]
                 pt2 = joints[idx2]
                 feat_stride = self.image_size / self.heatmap_size
@@ -508,6 +514,18 @@ class COCODataset(JointsDataset):
                 target_level2[i] = self.drawLimbMap(target_level2[i],pt1,pt2,self.sigma)
         targets.append(target_level2)
         target_weights.append(target_level2_weight)
+        
+        
+        for i,skeleton in enumerate(level3):
+            idx1,idx2 = skeleton
+            if target_level2_weight[idx1] > 0.5 and target_level2_weight[idx2] > 0.5:
+                target_level3[i] = self.composemap(target_level3[i],target_level2,skeleton)
+            else:
+                target_level3_weight[i] = 0
+        
+        targets.append(target_level3)
+        target_weights.append(target_level3_weight)
+
         return targets, target_weights
     
     def drawGaussian(self,target_level2,pt1,sigma):
@@ -560,7 +578,7 @@ class COCODataset(JointsDataset):
             x = x1
             res = np.zeros((maxX-x1,2))
 
-            for i in range(res.size()[0]):
+            for i in range(res.shape[0]):
                 if steep:
                     res[i][0] = y
                     res[i][1] = x
@@ -579,7 +597,15 @@ class COCODataset(JointsDataset):
             target_level2 = self.drawGaussian(target_level2,pt1,sigma)
         
         segment = getSegmentPoints(pt1[0],pt1[1],pt2[0],pt2[1])
+        result_map = np.zeros(target_level2.shape, dtype=np.float32)
         for i in range(segment.shape[0]):
-            target_level2 = self.drawGaussian(target_level2,[segment[i][0],segment[1]],sigma)
+            target_level2 = self.drawGaussian(target_level2,[segment[i][0],segment[i][1]],sigma)
+            result_map = np.maximum(result_map, target_level2)
 
-        return target_level2
+        return result_map
+    
+
+    def composemap(self,target_level3,target_level2,idx_set):
+        for i,idx in enumerate(idx_set):
+            target_level3 = np.maximum(target_level3,target_level2[idx])
+        return target_level3

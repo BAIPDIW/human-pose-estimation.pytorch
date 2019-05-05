@@ -131,17 +131,47 @@ class PoseResNet(nn.Module):
             padding=1 if extra.FINAL_CONV_KERNEL == 3 else 0
         )
 
-        self.conv2 = nn.Conv2d(256,256,kernel_size=3,stride=1,padding=1,bias = False)
-        self.bn2 = nn.BatchNorm2d(256,momentum=BN_MOMENTUM)
-        self.reul2 = nn.ReLU(inplcae = True)
+        self.channel_adapt_1 = nn.Conv2d(273,256,kernel_size=1,stride=1,bias=False)
 
-        self.level2_layer = nn.conv2d(
-            in_channels = extra.NUM_DECONV_FILTERS[-1],
+        self.level1_block = Bottleneck(256,64)
+        self.level1_layer = nn.Conv2d(
+            in_channels = 256,
             out_channels = 12,
             kernel_size = extra.FINAL_CONV_KERNEL,
             stride = 1,
             padding = 1 if extra.FINAL_CONV_KERNEL == 3 else 0
         )
+
+        self.channel_adapt_2 = nn.Conv2d(285,256,kernel_size=1,stride=1,bias=False)
+        self.level2_block = Bottleneck(256,64)
+        self.level2_layer = nn.Conv2d(
+            in_channels = 256,
+            out_channels = 6,
+            kernel_size = extra.FINAL_CONV_KERNEL,
+            stride = 1,
+            padding = 1 if extra.FINAL_CONV_KERNEL == 3 else 0
+        )
+
+        self.channel_adapt_3 = nn.Conv2d(279,256,kernel_size=1,stride=1,bias=False)
+        self.level3_block = Bottleneck(256,64)
+        self.level3_layer = nn.Conv2d(
+            in_channels = 256,
+            out_channels = 12,
+            kernel_size = extra.FINAL_CONV_KERNEL,
+            stride = 1,
+            padding = 1 if extra.FINAL_CONV_KERNEL == 3 else 0
+        )
+
+        self.channel_adapt_4 = nn.Conv2d(285,256,kernel_size=1,stride=1,bias=False)
+        self.level4_block = Bottleneck(256,64)
+        self.level4_layer = nn.Conv2d(
+            in_channels = 256,
+            out_channels = cfg.MODEL.NUM_JOINTS,
+            kernel_size = extra.FINAL_CONV_KERNEL,
+            stride = 1,
+            padding = 1 if extra.FINAL_CONV_KERNEL == 3 else 0
+        )
+
 
     def _make_layer(self, block, planes, blocks, stride=1):
         downsample = None
@@ -211,16 +241,34 @@ class PoseResNet(nn.Module):
         x = self.layer3(x)
         x = self.layer4(x)
 
-        x = self.deconv_layers(x)
+        x = self.deconv_layers(x)       #256x64x48
+        x_level0 = self.final_layer(x)  #  level0 17x64x48
 
-        x_level2 = self.conv2(x)
-        x_level2 = self.bn2(x_level2)
-        x_level2 = self.relu2(x_level2)
-        x_level2 = self.level2_layer(x)
+        x = torch.cat([x,x_level0],1)   #273x64x48
+        x =self.channel_adapt_1(x) #256x64x48
+
+        x1 = self.level1_block(x)   #1024x64x48
+        x_level1 = self.level1_layer(x1)# level1 12x64x48
         
-        x = self.final_layer(x)
+        x1 = torch.cat([x1,x_level1,x_level0],1) #1053x64x48
+        x1 = self.channel_adapt_2(x1) #256x64x48
 
-        return x,x_level2
+        x2 = self.level2_block(x1)  #1024x64x48
+        x_level2 = self.level2_layer(x2) #level2 #6x64x48
+
+        x2 = torch.cat([x2,x_level2,x_level0],1)#1047x64x48
+        x2 = self.channel_adapt_3(x2)#256x64x48
+
+        x3 = self.level3_block(x2) #1024x64x48
+        x_level3 = self.level3_layer(x3) #level1 #12x64x48
+
+        x3 = torch.cat([x3,x_level3,x_level0],1) #1053x64x48
+        x3 = self.channel_adapt_4(x3)#256x64x48
+
+        x4 = self.level4_block(x3)#1024x64x48
+        x_level4 = self.level4_layer(x4)#17x64x48
+        
+        return x_level0,x_level1,x_level2,x_level3,x_level4
 
     def init_weights(self, pretrained=''):
         if os.path.isfile(pretrained):
