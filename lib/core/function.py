@@ -43,6 +43,7 @@ def train(config, train_loader, model, criterion, optimizer, epoch,
         # compute output
         output_level0, output_level1, output_level2, output_level3, output_level4 = model(input)
         
+<<<<<<< HEAD
         
         target_level0 = targets[0]
         target_level0_weight = target_weights[0]
@@ -60,6 +61,17 @@ def train(config, train_loader, model, criterion, optimizer, epoch,
         target_level1 = target_level1.cuda(non_blocking=True)
         target_level1_weight = target_level1_weight.cuda(non_blocking=True)
 
+=======
+        target = targets[0]
+        target_weight = target_weights[0]
+        
+        target_level2 = targets[1]
+        target_level2_weight = target_weights[1]
+
+        target = target.cuda(non_blocking=True)
+        target_weight = target_weight.cuda(non_blocking=True)
+        
+>>>>>>> 0122fc8b9b1a5b6797bfa3f5646b460a8ecd0bd3
         target_level2 = target_level2.cuda(non_blocking=True)
         target_level2_weight = target_level2_weight.cuda(non_blocking=True)
         
@@ -138,7 +150,11 @@ def validate(config, val_loader, val_dataset, model, criterion, output_dir,
                 # input_flipped = model(input[:, :, :, ::-1])
                 input_flipped = np.flip(input.cpu().numpy(), 3).copy()
                 input_flipped = torch.from_numpy(input_flipped).cuda()
+<<<<<<< HEAD
                 _,_,_,_,output_flipped = model(input_flipped)
+=======
+                output_flipped,_ = model(input_flipped)
+>>>>>>> 0122fc8b9b1a5b6797bfa3f5646b460a8ecd0bd3
                 output_flipped = flip_back(output_flipped.cpu().numpy(),
                                            val_dataset.flip_pairs)
                 output_flipped = torch.from_numpy(output_flipped.copy()).cuda()

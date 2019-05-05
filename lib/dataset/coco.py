@@ -546,9 +546,9 @@ class COCODataset(JointsDataset):
         # Image range
         img_x = max(0, ul[0]), min(br[0], self.heatmap_size[0])
         img_y = max(0, ul[1]), min(br[1], self.heatmap_size[1])
-
         target_level2[img_y[0]:img_y[1], img_x[0]:img_x[1]] = \
-                g[g_y[0]:g_y[1], g_x[0]:g_x[1]]        
+                g[g_y[0]:g_y[1], g_x[0]:g_x[1]]  
+     
         return target_level2
 
 
