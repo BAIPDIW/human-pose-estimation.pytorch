@@ -17,6 +17,8 @@ import torch.nn as nn
 BN_MOMENTUM = 0.1
 logger = logging.getLogger(__name__)
 
+from models.non_local_gaussian import NONLocalBlock2D
+
 class ChannelAttention(nn.Module):
     # def __init__(self, in_planes, ratio=16):
     #     super(ChannelAttention, self).__init__()
@@ -48,6 +50,8 @@ class ChannelAttention(nn.Module):
 
         self.conv3 = nn.Conv2d(in_channels=512,out_channels=in_planes,kernel_size = 1,bias=False)
         self.sigmoid = nn.Sigmoid()
+
+        self.non_local = NONLocalBlock2D(in_channels=in_planes)
     
     def forward(self, x):
         y = self.conv1(x)
@@ -68,7 +72,10 @@ class ChannelAttention(nn.Module):
         y = self.conv3(y)
         y = self.sigmoid(y)
 
-        return y
+        x = x*y
+
+        x = self.non_local(x)
+        return x
 
 
 
@@ -85,9 +92,9 @@ class SpatialAttention(nn.Module):
     def forward(self, x):
         avg_out = torch.mean(x, dim=1, keepdim=True)
         max_out, _ = torch.max(x, dim=1, keepdim=True)
-        x = torch.cat([avg_out, max_out], dim=1)
-        x = self.conv1(x)
-        return self.sigmoid(x)
+        y = torch.cat([avg_out, max_out], dim=1)
+        y = self.conv1(y)
+        return self.sigmoid(y)*x
 
 
 def conv3x3(in_planes, out_planes, stride=1):
@@ -122,9 +129,6 @@ class BasicBlock(nn.Module):
 
         out = self.conv2(out)
         out = self.bn2(out)
-
-        out = self.ca(out) * out
-        out = self.sa(out) * out
 
         if self.downsample is not None:
             residual = self.downsample(x)
@@ -171,9 +175,6 @@ class Bottleneck(nn.Module):
         out = self.conv3(out)
         out = self.bn3(out)
 
-        out = self.ca(out) * out
-        out = self.sa(out) * out
-
         if self.downsample is not None:
             residual = self.downsample(x)
 
@@ -181,49 +182,6 @@ class Bottleneck(nn.Module):
         out = self.relu(out)
 
         return out
-
-
-
-class SEBottleneck(nn.Module):
-    expansion = 4
-
-    def __init__(self, inplanes, planes, stride=1, downsample=None, reduction=16):
-        super(SEBottleneck, self).__init__()
-        self.conv1 = nn.Conv2d(inplanes, planes, kernel_size=1, bias=False)
-        self.bn1 = nn.BatchNorm2d(planes)
-        self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=stride,
-                               padding=1, bias=False)
-        self.bn2 = nn.BatchNorm2d(planes)
-        self.conv3 = nn.Conv2d(planes, planes * 4, kernel_size=1, bias=False)
-        self.bn3 = nn.BatchNorm2d(planes * 4)
-        self.relu = nn.ReLU(inplace=True)
-        self.se = SELayer(planes * 4, reduction)
-        self.downsample = downsample
-        self.stride = stride
-
-    def forward(self, x):
-        residual = x
-
-        out = self.conv1(x)
-        out = self.bn1(out)
-        out = self.relu(out)
-
-        out = self.conv2(out)
-        out = self.bn2(out)
-        out = self.relu(out)
-
-        out = self.conv3(out)
-        out = self.bn3(out)
-        out = self.se(out)
-
-        if self.downsample is not None:
-            residual = self.downsample(x)
-
-        out += residual
-        out = self.relu(out)
-
-        return out
-
 
 class PoseResNet(nn.Module):
 
@@ -239,9 +197,13 @@ class PoseResNet(nn.Module):
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
         self.layer1 = self._make_layer(block, 64, layers[0])
+        self.sa0 = ChannelAttention(256)
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
+        self.sa1 = ChannelAttention(512)
         self.layer3 = self._make_layer(block, 256, layers[2], stride=2)
+        self.sa2 = ChannelAttention(1024)
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2)
+        self.sa3 = ChannelAttention(2048)
 
         # used for deconv layers
         self.deconv_layers = self._make_deconv_layer(
@@ -322,9 +284,13 @@ class PoseResNet(nn.Module):
         x = self.maxpool(x)
 
         x = self.layer1(x)
+        x = self.sa0(x)
         x = self.layer2(x)
+        x = self.sa1(x)
         x = self.layer3(x)
+        x = self.sa2(x)
         x = self.layer4(x)
+        x = self.sa3(x)
 
         x = self.deconv_layers(x)
         x = self.final_layer(x)
